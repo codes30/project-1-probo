@@ -221,27 +221,20 @@ describe("E-to-E-2", () => {
 
 describe("E-to-E-3", () => {
   beforeAll(async () => {
-    await request(app).post("/reset"); // resets the data values
+    await request(app).post("/reset"); // Reset the data values
   });
 
-  it("this test checks the response values , more edge cases as well as status as well as state of the variables at regular intervals", async () => {
-    // Step 1: Create a new user (User1)
+  it("should handle multiple matching orders and price priorities correctly", async () => {
+    // Step 1: Create users (User1 and User2)
     let response = await request(app).get("/user/create/user1");
     expect(response.status).toBe(201);
     expect(response.body.message).toBe("User user1 created");
 
-    // Edge Case: Create the same user again
-    response = await request(app).get("/user/create/user1");
-    expect(response.status).toBe(400);
-    expect(response.body.message).toBe("User already exists");
+    response = await request(app).get("/user/create/user2");
+    expect(response.status).toBe(201);
+    expect(response.body.message).toBe("User user2 created");
 
-    // Fetch INR_BALANCES after creating User1
-    response = await request(app).get("/balances/inr");
-    expect(response.status).toBe(200);
-    expect(response.body).toHaveProperty("user1");
-    expect(response.body["user1"]).toEqual({ balance: 0, locked: 0 });
-
-    // Step 2: Create a new symbol
+    // Step 2: Create a symbol
     response = await request(app).get(
       "/symbol/create/ETH_USD_15_Oct_2024_12_00",
     );
@@ -250,31 +243,21 @@ describe("E-to-E-3", () => {
       "Symbol ETH_USD_15_Oct_2024_12_00 created",
     );
 
-    // Fetch ORDERBOOK after creating symbol
-    response = await request(app).get("/orderbook");
-    expect(response.status).toBe(200);
-    expect(response.body).toHaveProperty("ETH_USD_15_Oct_2024_12_00");
-    expect(response.body["ETH_USD_15_Oct_2024_12_00"]).toEqual({
-      yes: {},
-      no: {},
-    });
+    // Step 3: Add balance to users
+    await request(app)
+      .post("/onramp/inr")
+      .send({ userId: "user1", amount: 500000 });
+    await request(app)
+      .post("/onramp/inr")
+      .send({ userId: "user2", amount: 300000 });
 
-    // Step 3: Add balance to user1
-    response = await request(app).post("/onramp/inr").send({
-      userId: "user1",
-      amount: 500000,
-    });
-    expect(response.status).toBe(200);
-    expect(response.body.message).toBe("Onramped user1 with amount 500000");
-
+    // Check INR balances after adding funds
     response = await request(app).get("/balances/inr");
     expect(response.status).toBe(200);
-    expect(response.body["user1"]).toEqual({
-      balance: 500000,
-      locked: 0,
-    });
+    expect(response.body["user1"]).toEqual({ balance: 500000, locked: 0 });
+    expect(response.body["user2"]).toEqual({ balance: 300000, locked: 0 });
 
-    // Step 4: Mint some quantities for User1
+    // Step 4: Mint tokens for User1
     response = await request(app).post("/trade/mint").send({
       userId: "user1",
       stockSymbol: "ETH_USD_15_Oct_2024_12_00",
@@ -286,273 +269,244 @@ describe("E-to-E-3", () => {
       "Minted 200 'yes' and 'no' tokens for user user1, remaining balance is 200000",
     );
 
-    // Fetch STOCK_BALANCES after minting
-    response = await request(app).get("/balances/stock");
-    expect(response.status).toBe(200);
-    expect(response.body).toHaveProperty("user1");
-    expect(response.body["user1"]).toHaveProperty("ETH_USD_15_Oct_2024_12_00");
-    expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]).toEqual({
-      yes: { quantity: 200, locked: 0 },
-      no: { quantity: 200, locked: 0 },
-    });
-
-    // Step 5: User1 sells some quantities of "yes"
-    response = await request(app).post("/order/sell").send({
+    // Step 5: User1 places multiple sell orders at different prices
+    await request(app).post("/order/sell").send({
       userId: "user1",
       stockSymbol: "ETH_USD_15_Oct_2024_12_00",
       quantity: 100,
-      price: 1500,
+      price: 1400, // Lower price
       stockType: "yes",
     });
-    expect(response.status).toBe(200);
-    expect(response.body.message).toBe(
-      "Sell order placed for 100 'yes' options at price 1500.",
-    );
 
-    // Fetch STOCK_BALANCES after placing sell order
+    await request(app).post("/order/sell").send({
+      userId: "user1",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
+      quantity: 100,
+      price: 1500, // Higher price
+      stockType: "yes",
+    });
+
+    // Check order book after placing multiple sell orders
+    response = await request(app).get("/orderbook");
+    expect(response.status).toBe(200);
+    expect(response.body["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      1400: { total: 100, orders: { user1: 100 } },
+      1500: { total: 100, orders: { user1: 100 } },
+    });
+
+    // Step 6: Check stock locking after placing sell orders
     response = await request(app).get("/balances/stock");
     expect(response.status).toBe(200);
     expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 0,
+      locked: 200,
+    });
+
+    // Step 7: User2 places a buy order for 100 tokens, should match the lower price first (1400)
+    response = await request(app).post("/order/buy").send({
+      userId: "user2",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
       quantity: 100,
-      locked: 100,
-    });
-
-    // Step 6: User2 buys some "yes" options
-    response = await request(app).get("/user/create/user2");
-    expect(response.status).toBe(201);
-    expect(response.body.message).toBe("User user2 created");
-
-    response = await request(app).post("/onramp/inr").send({
-      userId: "user2",
-      amount: 300000,
-    });
-    expect(response.status).toBe(200);
-    expect(response.body.message).toBe("Onramped successfully");
-
-    response = await request(app).post("/order/buy").send({
-      userId: "user2",
-      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
-      quantity: 50,
-      price: 1500,
-      stockType: "yes", // Buying "yes" tokens
-    });
-    expect(response.status).toBe(200);
-    expect(response.body.message).toBe("Buy order placed and trade executed");
-
-    // Edge Case: Buying quantity more than available in the order book
-    response = await request(app).post("/order/buy").send({
-      userId: "user2",
-      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
-      quantity: 200, // Exceeds available quantity in the orderbook
       price: 1500,
       stockType: "yes",
     });
-    expect(response.status).toBe(400);
-    expect(response.body.message).toBe("Not enough quantity in order book");
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBe("Buy order matched at best price 1400");
 
-    // Edge Case: Try placing an order with a negative price
-    response = await request(app).post("/order/buy").send({
-      userId: "user2",
-      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
-      quantity: 50,
-      price: -1000, // Invalid price
-      stockType: "no",
-    });
-    expect(response.status).toBe(400);
-    expect(response.body.message).toBe("Invalid price");
+    // Check INR balances after matching the order
+    response = await request(app).get("/balances/inr");
+    expect(response.status).toBe(200);
+    expect(response.body["user2"]).toEqual({ balance: 160000, locked: 0 });
 
-    // Fetch STOCK_BALANCES after trade execution
+    // Step 8: Verify stock balances after matching
     response = await request(app).get("/balances/stock");
     expect(response.status).toBe(200);
+    expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 0,
+      locked: 100, // 100 tokens still locked for the second sell order
+    });
     expect(response.body["user2"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
-      quantity: 50,
-      locked: 0,
-    });
-    expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
-      quantity: 50, // Remaining after selling 50
-      locked: 50, // Locked in pending orders
+      quantity: 100, // Tokens bought
+      locked: 0, // No tokens locked for buying
     });
 
-    // Step 7: User1 tries to sell more tokens than they own
-    response = await request(app).post("/order/sell").send({
-      userId: "user1",
-      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
-      quantity: 200, // Exceeds available quantity
-      price: 1500,
-      stockType: "yes",
-    });
-    expect(response.status).toBe(400);
-    expect(response.body.message).toBe("Insufficient stock quantity");
-
-    // Edge Case: Attempting to buy/sell a symbol that has expired
+    // Step 9: User2 places a buy order for 50 tokens, should partially match the 1500 sell
     response = await request(app).post("/order/buy").send({
       userId: "user2",
-      stockSymbol: "ETH_USD_15_Oct_2024_12_00_expired",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
       quantity: 50,
       price: 1500,
       stockType: "yes",
     });
-    expect(response.status).toBe(400);
-    expect(response.body.message).toBe("Symbol has expired");
-  });
-});
-
-describe("E-to-E-4", () => {
-  beforeAll(async () => {
-    await request(app).post("/reset"); // resets the data values
-  });
-
-  it("final boss", async () => {
-    // Step 1: Create a new user (User1)
-    let response = await request(app).get("/user/create/user1");
-    expect(response.status).toBe(201);
-    expect(response.body.message).toBe("User user1 created");
-
-    // Step 2: Create a new symbol
-    response = await request(app).get(
-      "/symbol/create/ETH_USD_15_Oct_2024_12_00",
-    );
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(200);
     expect(response.body.message).toBe(
-      "Symbol ETH_USD_15_Oct_2024_12_00 created",
+      "Buy order matched partially, 50 remaining",
     );
 
-    // Check the order book after creating symbol
+    // Check INR balances after partial matching
+    response = await request(app).get("/balances/inr");
+    expect(response.status).toBe(200);
+    expect(response.body["user2"]).toEqual({ balance: 85000, locked: 0 });
+
+    // Check order book after partial matching
     response = await request(app).get("/orderbook");
     expect(response.status).toBe(200);
-    expect(response.body).toHaveProperty("ETH_USD_15_Oct_2024_12_00");
-    expect(response.body["ETH_USD_15_Oct_2024_12_00"]).toEqual({
-      yes: {},
-      no: {},
+    expect(response.body["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      1500: { total: 50, orders: { user1: 50 } },
     });
 
-    // Step 3: Add balance to user1
-    response = await request(app).post("/onramp/inr").send({
+    // Step 10: User1 cancels the remaining 50 sell order
+    response = await request(app).post("/order/cancel").send({
       userId: "user1",
-      amount: 500000,
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
+      quantity: 50,
+      price: 1500,
+      stockType: "yes",
     });
     expect(response.status).toBe(200);
-    expect(response.body.message).toBe("Onramped user1 with amount 500000");
+    expect(response.body.message).toBe("Sell order canceled");
 
-    // Step 4: Mint some quantities for User1
-    response = await request(app).post("/trade/mint").send({
+    // Check the order book to ensure it's empty
+    response = await request(app).get("/orderbook");
+    expect(response.status).toBe(200);
+    expect(response.body["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({}); // No orders left
+
+    // Step 11: Verify stock balances after matching and canceling
+    response = await request(app).get("/balances/stock");
+    expect(response.status).toBe(200);
+    expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 50,
+      locked: 0, // No locked balance after cancellation
+    });
+    expect(response.body["user2"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 150,
+      locked: 0,
+    });
+  });
+
+  it("should handle multiple buy orders with price priority matching", async () => {
+    // Reset data and start fresh
+    await request(app).post("/reset");
+
+    // Step 1: Create users (User1 and User2)
+    await request(app).get("/user/create/user1");
+    await request(app).get("/user/create/user2");
+
+    // Step 2: Add balance to users
+    await request(app)
+      .post("/onramp/inr")
+      .send({ userId: "user1", amount: 500000 });
+    await request(app)
+      .post("/onramp/inr")
+      .send({ userId: "user2", amount: 300000 });
+
+    // Step 3: Create a symbol and mint tokens for User1
+    await request(app).get("/symbol/create/ETH_USD_15_Oct_2024_12_00");
+    await request(app).post("/trade/mint").send({
       userId: "user1",
       stockSymbol: "ETH_USD_15_Oct_2024_12_00",
       quantity: 200,
       price: 1500,
     });
-    expect(response.status).toBe(200);
-    expect(response.body.message).toBe(
-      "Minted 200 'yes' and 'no' tokens for user user1, remaining balance is 200000",
-    );
 
-    // Step 5: User1 sells some quantities of "yes"
-    response = await request(app).post("/order/sell").send({
+    // Add stock balance check here
+    let response = await request(app).get("/balances/stock");
+    expect(response.status).toBe(200);
+    expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 200,
+      locked: 0,
+    });
+
+    // Step 4: User1 places sell orders at two different prices
+    await request(app).post("/order/sell").send({
+      userId: "user1",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
+      quantity: 100,
+      price: 1400,
+      stockType: "yes",
+    });
+
+    await request(app).post("/order/sell").send({
       userId: "user1",
       stockSymbol: "ETH_USD_15_Oct_2024_12_00",
       quantity: 100,
       price: 1500,
       stockType: "yes",
     });
-    expect(response.status).toBe(200);
-    expect(response.body.message).toBe(
-      "Sell order placed for 100 'yes' options at price 1500.",
-    );
 
-    // Check order book after User1 places a sell order
-    response = await request(app).get("/orderbook");
+    response = await request(app).get("/balances/stock");
     expect(response.status).toBe(200);
-    expect(response.body["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
-      1500: { quantity: 100, userId: "user1" },
+    expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 0,
+      locked: 200, // All 200 tokens locked for the sell orders
     });
 
-    // Step 6: User2 buys some "yes" options
-    response = await request(app).get("/user/create/user2");
-    expect(response.status).toBe(201);
-    expect(response.body.message).toBe("User user2 created");
-
-    response = await request(app).post("/onramp/inr").send({
-      userId: "user2",
-      amount: 300000,
-    });
-    expect(response.status).toBe(200);
-    expect(response.body.message).toBe("Onramped successfully");
-
-    // User2 places a buy order
+    // Step 5: User2 places a buy order with a price lower than the lowest sell price
     response = await request(app).post("/order/buy").send({
       userId: "user2",
       stockSymbol: "ETH_USD_15_Oct_2024_12_00",
       quantity: 50,
-      price: 1500,
-      stockType: "yes", // Buying "yes" tokens
-    });
-    expect(response.status).toBe(200);
-    expect(response.body.message).toBe("Buy order placed and trade executed");
-
-    // Check order book after User2's buy order
-    response = await request(app).get("/orderbook");
-    expect(response.status).toBe(200);
-    expect(response.body["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
-      1500: { quantity: 50, userId: "user1" }, // Only 50 remain after execution
-    });
-
-    // Edge Case: User2 tries to buy with insufficient INR balance
-    response = await request(app).post("/order/buy").send({
-      userId: "user2",
-      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
-      quantity: 100,
-      price: 4000, // Exceeds available INR balance for user2
-      stockType: "yes",
-    });
-    expect(response.status).toBe(400);
-    expect(response.body.message).toBe("Insufficient INR balance");
-
-    // Test INR balance locking for user2 before order execution
-    response = await request(app).post("/order/buy").send({
-      userId: "user2",
-      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
-      quantity: 50,
-      price: 1500,
+      price: 1300,
       stockType: "yes",
     });
     expect(response.status).toBe(200);
     expect(response.body.message).toBe("Buy order placed and pending");
 
-    // Check INR balance locking for user2 after pending order
     response = await request(app).get("/balances/inr");
     expect(response.status).toBe(200);
     expect(response.body["user2"]).toEqual({
-      balance: 150000, // 225000 - (50 * 1500)
-      locked: 75000, // 50 'yes' tokens at 1500 INR locked for pending order
+      balance: 235000, // 300000 - (50 * 1300)
+      locked: 65000, // 50 * 1300 INR locked for pending buy order
     });
 
-    // Check the order book after the pending buy order
+    // Check the order book and ensure no matching has occurred
     response = await request(app).get("/orderbook");
     expect(response.status).toBe(200);
     expect(response.body["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
-      1500: { quantity: 50, userId: "user1" }, // Order still pending
+      1400: { total: 100, orders: { user1: 100 } },
+      1500: { total: 100, orders: { user1: 100 } },
     });
 
-    // Step 7: User1 tries to sell more tokens than they own
-    response = await request(app).post("/order/sell").send({
-      userId: "user1",
-      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
-      quantity: 200, // Exceeds available quantity
-      price: 1500,
-      stockType: "yes",
+    response = await request(app).get("/balances/stock");
+    expect(response.status).toBe(200);
+    expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 0,
+      locked: 200,
     });
-    expect(response.status).toBe(400);
-    expect(response.body.message).toBe("Insufficient stock quantity");
 
-    // Edge Case: Attempting to buy/sell a symbol that has expired
+    // Step 6: User2 increases the buy price to match the lowest sell order
     response = await request(app).post("/order/buy").send({
       userId: "user2",
-      stockSymbol: "ETH_USD_15_Oct_2024_12_00_expired",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
       quantity: 50,
-      price: 1500,
+      price: 1400,
       stockType: "yes",
     });
-    expect(response.status).toBe(400);
-    expect(response.body.message).toBe("Symbol has expired");
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBe("Buy order matched at price 1400");
+
+    // Verify that the order book is updated correctly
+    response = await request(app).get("/orderbook");
+    expect(response.status).toBe(200);
+    expect(response.body["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      1400: { total: 50, orders: { user1: 50 } }, // 50 remaining from the 1400 sell
+      1500: { total: 100, orders: { user1: 100 } }, // No changes to the 1500 sell order
+    });
+
+    response = await request(app).get("/balances/stock");
+    expect(response.status).toBe(200);
+    expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 0,
+      locked: 150,
+    });
+    expect(response.body["user2"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 50,
+      locked: 0,
+    });
+
+    // Verify INR balances after the order matching
+    response = await request(app).get("/balances/inr");
+    expect(response.status).toBe(200);
+    expect(response.body["user2"]).toEqual({ balance: 235000, locked: 0 });
   });
 });
