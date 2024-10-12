@@ -15,7 +15,7 @@ describe("E-to-E-1", () => {
     // Step 2: Add balance to user5
     response = await request(app).post("/onramp/inr").send({
       userId: "user5",
-      amount: 50000, // ₹500.00
+      amount: 50000,
     });
     expect(response.status).toBe(200);
     expect(response.body.message).toBe("Onramped user5 with amount 50000");
@@ -67,7 +67,6 @@ describe("E-to-E-1", () => {
     expect(response.status).toBe(200);
     expect(response.body.message).toBe("Onramped user6 with amount 20000");
 
-    // User6 buys 10 'no' tokens
     response = await request(app).post("/order/buy").send({
       userId: "user6",
       stockSymbol: "AAPL_USD_25_Oct_2024_14_00",
@@ -86,7 +85,7 @@ describe("E-to-E-1", () => {
       locked: 0,
     });
     expect(response.body["user5"]).toEqual({
-      balance: 10000, // 0 + (10 * 1000)
+      balance: 10000,
       locked: 0,
     });
   });
@@ -106,7 +105,7 @@ describe("E-to-E-2", () => {
     // Step 2: Add balance to user3
     response = await request(app).post("/onramp/inr").send({
       userId: "user3",
-      amount: 100000, // ₹1000.00
+      amount: 100000,
     });
     expect(response.status).toBe(200);
     expect(response.body.message).toBe("Onramped user3 with amount 100000");
@@ -165,8 +164,8 @@ describe("E-to-E-2", () => {
     response = await request(app).get("/balances/stock");
     expect(response.status).toBe(200);
     expect(response.body["user3"]["ETH_USD_20_Oct_2024_10_00"]["yes"]).toEqual({
-      quantity: 30, // 50 - 20
-      locked: 20, // Locked 20 units
+      quantity: 30,
+      locked: 20,
     });
 
     // Step 6: Create User4 and buy the 'yes' tokens from the order book
@@ -197,11 +196,11 @@ describe("E-to-E-2", () => {
     response = await request(app).get("/balances/inr");
     expect(response.status).toBe(200);
     expect(response.body["user4"]).toEqual({
-      balance: 20000, // 60000 - (20 * 2000)
+      balance: 20000,
       locked: 0,
     });
     expect(response.body["user3"]).toEqual({
-      balance: 40000, // 0 + (20 * 2000)
+      balance: 40000,
       locked: 0,
     });
 
@@ -213,7 +212,7 @@ describe("E-to-E-2", () => {
       locked: 0,
     });
     expect(response.body["user3"]["ETH_USD_20_Oct_2024_10_00"]["yes"]).toEqual({
-      quantity: 30, // Remaining after selling 20
+      quantity: 30,
       locked: 0,
     });
   });
@@ -274,7 +273,7 @@ describe("E-to-E-3", () => {
       userId: "user1",
       stockSymbol: "ETH_USD_15_Oct_2024_12_00",
       quantity: 100,
-      price: 1400, // Lower price
+      price: 1400,
       stockType: "yes",
     });
 
@@ -282,7 +281,7 @@ describe("E-to-E-3", () => {
       userId: "user1",
       stockSymbol: "ETH_USD_15_Oct_2024_12_00",
       quantity: 100,
-      price: 1500, // Higher price
+      price: 1500,
       stockType: "yes",
     });
 
@@ -323,11 +322,11 @@ describe("E-to-E-3", () => {
     expect(response.status).toBe(200);
     expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
       quantity: 0,
-      locked: 100, // 100 tokens still locked for the second sell order
+      locked: 100,
     });
     expect(response.body["user2"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
-      quantity: 100, // Tokens bought
-      locked: 0, // No tokens locked for buying
+      quantity: 100,
+      locked: 0,
     });
 
     // Step 9: User2 places a buy order for 50 tokens, should partially match the 1500 sell
@@ -376,7 +375,7 @@ describe("E-to-E-3", () => {
     expect(response.status).toBe(200);
     expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
       quantity: 50,
-      locked: 0, // No locked balance after cancellation
+      locked: 0,
     });
     expect(response.body["user2"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
       quantity: 150,
@@ -438,7 +437,7 @@ describe("E-to-E-3", () => {
     expect(response.status).toBe(200);
     expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
       quantity: 0,
-      locked: 200, // All 200 tokens locked for the sell orders
+      locked: 200,
     });
 
     // Step 5: User2 places a buy order with a price lower than the lowest sell price
@@ -455,8 +454,8 @@ describe("E-to-E-3", () => {
     response = await request(app).get("/balances/inr");
     expect(response.status).toBe(200);
     expect(response.body["user2"]).toEqual({
-      balance: 235000, // 300000 - (50 * 1300)
-      locked: 65000, // 50 * 1300 INR locked for pending buy order
+      balance: 235000,
+      locked: 65000,
     });
 
     // Check the order book and ensure no matching has occurred
@@ -508,5 +507,318 @@ describe("E-to-E-3", () => {
     response = await request(app).get("/balances/inr");
     expect(response.status).toBe(200);
     expect(response.body["user2"]).toEqual({ balance: 235000, locked: 0 });
+  });
+});
+
+describe("E-to-E-4", () => {
+  beforeAll(async () => {
+    await request(app).post("/reset"); // Reset the data values
+  });
+
+  it("should handle multiple matching orders and price priorities correctly", async () => {
+    // Step 1: Create users (User1 and User2)
+    let response = await request(app).get("/user/create/user1");
+    expect(response.status).toBe(201);
+    expect(response.body.message).toBe("User user1 created");
+
+    response = await request(app).get("/user/create/user2");
+    expect(response.status).toBe(201);
+    expect(response.body.message).toBe("User user2 created");
+
+    // Step 2: Create a symbol
+    response = await request(app).get(
+      "/symbol/create/ETH_USD_15_Oct_2024_12_00",
+    );
+    expect(response.status).toBe(201);
+    expect(response.body.message).toBe(
+      "Symbol ETH_USD_15_Oct_2024_12_00 created",
+    );
+
+    // Step 3: Add balance to users
+    await request(app)
+      .post("/onramp/inr")
+      .send({ userId: "user1", amount: 500000 });
+    await request(app)
+      .post("/onramp/inr")
+      .send({ userId: "user2", amount: 300000 });
+
+    // Check INR balances after adding funds
+    response = await request(app).get("/balances/inr");
+    expect(response.status).toBe(200);
+    expect(response.body["user1"]).toEqual({ balance: 500000, locked: 0 });
+    expect(response.body["user2"]).toEqual({ balance: 300000, locked: 0 });
+
+    // Step 4: Mint tokens for User1
+    response = await request(app).post("/trade/mint").send({
+      userId: "user1",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
+      quantity: 200,
+      price: 1500,
+    });
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBe(
+      "Minted 200 'yes' and 'no' tokens for user user1, remaining balance is 200000",
+    );
+
+    // Step 5: User1 places multiple sell orders at different prices
+    await request(app).post("/order/sell").send({
+      userId: "user1",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
+      quantity: 100,
+      price: 1400,
+      stockType: "yes",
+    });
+
+    await request(app).post("/order/sell").send({
+      userId: "user1",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
+      quantity: 100,
+      price: 1500,
+      stockType: "yes",
+    });
+
+    // Check order book after placing multiple sell orders
+    response = await request(app).get("/orderbook");
+    expect(response.status).toBe(200);
+    expect(response.body["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      1400: { total: 100, orders: { user1: 100 } },
+      1500: { total: 100, orders: { user1: 100 } },
+    });
+
+    // Step 6: Check stock locking after placing sell orders
+    response = await request(app).get("/balances/stock");
+    expect(response.status).toBe(200);
+    expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 0,
+      locked: 200,
+    });
+
+    // Step 7: User2 places a buy order for 100 tokens, should match the lower price first (1400)
+    response = await request(app).post("/order/buy").send({
+      userId: "user2",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
+      quantity: 100,
+      price: 1500,
+      stockType: "yes",
+    });
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBe("Buy order matched at best price 1400");
+
+    // Check INR balances after matching the order
+    response = await request(app).get("/balances/inr");
+    expect(response.status).toBe(200);
+    expect(response.body["user2"]).toEqual({ balance: 160000, locked: 0 });
+
+    // Step 8: Verify stock balances after matching
+    response = await request(app).get("/balances/stock");
+    expect(response.status).toBe(200);
+    expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 0,
+      locked: 100,
+    });
+    expect(response.body["user2"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 100,
+      locked: 0,
+    });
+
+    // Step 9: User2 places a buy order for 50 tokens, should partially match the 1500 sell
+    response = await request(app).post("/order/buy").send({
+      userId: "user2",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
+      quantity: 50,
+      price: 1500,
+      stockType: "yes",
+    });
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBe(
+      "Buy order matched partially, 50 remaining",
+    );
+
+    // Check INR balances after partial matching
+    response = await request(app).get("/balances/inr");
+    expect(response.status).toBe(200);
+    expect(response.body["user2"]).toEqual({ balance: 85000, locked: 0 });
+
+    // Check order book after partial matching
+    response = await request(app).get("/orderbook");
+    expect(response.status).toBe(200);
+    expect(response.body["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      1500: { total: 50, orders: { user1: 50 } },
+    });
+
+    // Step 10: User1 cancels the remaining 50 sell order
+    response = await request(app).post("/order/cancel").send({
+      userId: "user1",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
+      quantity: 50,
+      price: 1500,
+      stockType: "yes",
+    });
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBe("Sell order canceled");
+
+    // Check the order book to ensure it's empty
+    response = await request(app).get("/orderbook");
+    expect(response.status).toBe(200);
+    expect(response.body["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({}); // No orders left
+
+    // Step 11: Verify stock balances after matching and canceling
+    response = await request(app).get("/balances/stock");
+    expect(response.status).toBe(200);
+    expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 50,
+      locked: 0,
+    });
+    expect(response.body["user2"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 150,
+      locked: 0,
+    });
+  });
+
+  it("should handle multiple buy orders with price priority matching when a third user introduces a matching sell price", async () => {
+    // Reset data and start fresh
+    await request(app).post("/reset");
+
+    // Step 1: Create users (User1, User2, and User3)
+    await request(app).get("/user/create/user1");
+    await request(app).get("/user/create/user2");
+    await request(app).get("/user/create/user3");
+
+    // Step 2: Add balance to users
+    await request(app)
+      .post("/onramp/inr")
+      .send({ userId: "user1", amount: 500000 });
+    await request(app)
+      .post("/onramp/inr")
+      .send({ userId: "user2", amount: 300000 });
+    await request(app)
+      .post("/onramp/inr")
+      .send({ userId: "user3", amount: 400000 });
+
+    // Step 3: Create a symbol and mint tokens for User1 and User3
+    await request(app).get("/symbol/create/ETH_USD_15_Oct_2024_12_00");
+    await request(app).post("/trade/mint").send({
+      userId: "user1",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
+      quantity: 200,
+      price: 1500,
+    });
+
+    await request(app).post("/trade/mint").send({
+      userId: "user3",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
+      quantity: 100,
+      price: 1300,
+    });
+
+    // Add stock balance check here for User3
+    let response = await request(app).get("/balances/stock");
+    expect(response.status).toBe(200);
+    expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 200,
+      locked: 0,
+    });
+    expect(response.body["user3"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 100,
+      locked: 0,
+    });
+
+    // Step 4: User1 places sell orders at two different prices
+    await request(app).post("/order/sell").send({
+      userId: "user1",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
+      quantity: 100,
+      price: 1400,
+      stockType: "yes",
+    });
+
+    await request(app).post("/order/sell").send({
+      userId: "user1",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
+      quantity: 100,
+      price: 1500,
+      stockType: "yes",
+    });
+
+    response = await request(app).get("/balances/stock");
+    expect(response.status).toBe(200);
+    expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 0,
+      locked: 200, // All 200 tokens locked for the sell orders
+    });
+
+    // Step 5: User2 places a buy order with a price lower than the lowest sell price
+    response = await request(app).post("/order/buy").send({
+      userId: "user2",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
+      quantity: 50,
+      price: 1300,
+      stockType: "yes",
+    });
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBe("Buy order placed and pending");
+
+    response = await request(app).get("/balances/inr");
+    expect(response.status).toBe(200);
+    expect(response.body["user2"]).toEqual({
+      balance: 235000,
+      locked: 65000,
+    });
+
+    // Check the order book and ensure no matching has occurred
+    response = await request(app).get("/orderbook");
+    expect(response.status).toBe(200);
+    expect(response.body["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      1400: { total: 100, orders: { user1: 100 } },
+      1500: { total: 100, orders: { user1: 100 } },
+    });
+
+    response = await request(app).get("/balances/stock");
+    expect(response.status).toBe(200);
+    expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 0,
+      locked: 200,
+    });
+
+    // Step 6: User3 places a sell order at the price matching User2's buy order
+    response = await request(app).post("/order/sell").send({
+      userId: "user3",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
+      quantity: 50,
+      price: 1300,
+      stockType: "yes",
+    });
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBe("Sell order matched at price 1300");
+
+    // Verify that the order book is updated correctly the buy order matches immediatly
+    response = await request(app).get("/orderbook");
+    expect(response.status).toBe(200);
+    expect(response.body["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      1400: { total: 100, orders: { user1: 100 } },
+      1500: { total: 100, orders: { user1: 100 } },
+    });
+
+    // Check User3 and User2's stock balances after matching
+    response = await request(app).get("/balances/stock");
+    expect(response.status).toBe(200);
+    expect(response.body["user1"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 0,
+      locked: 200,
+    });
+    expect(response.body["user2"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 50,
+      locked: 0,
+    });
+    expect(response.body["user3"]["ETH_USD_15_Oct_2024_12_00"]["yes"]).toEqual({
+      quantity: 0,
+      locked: 0,
+    });
+
+    // Verify INR balances after the order matching
+    response = await request(app).get("/balances/inr");
+    expect(response.status).toBe(200);
+    expect(response.body["user2"]).toEqual({ balance: 235000, locked: 0 });
+    expect(response.body["user3"]).toEqual({ balance: 465000, locked: 0 });
   });
 });
