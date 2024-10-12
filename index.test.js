@@ -268,6 +268,17 @@ describe("E-to-E-3", () => {
       "Minted 200 'yes' and 'no' tokens for user user1, remaining balance is 200000",
     );
 
+    // Insufficient INR Balance for User2 when placing buy order
+    response = await request(app).post("/order/buy").send({
+      userId: "user2",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
+      quantity: 500,
+      price: 1500,
+      stockType: "yes",
+    });
+    expect(response.status).toBe(400);
+    expect(response.body.message).toBe("Insufficient INR balance");
+
     // Step 5: User1 places multiple sell orders at different prices
     await request(app).post("/order/sell").send({
       userId: "user1",
@@ -284,6 +295,17 @@ describe("E-to-E-3", () => {
       price: 1500,
       stockType: "yes",
     });
+
+    // Insufficient Stock Balance for User1 when placing a sell order
+    response = await request(app).post("/order/sell").send({
+      userId: "user1",
+      stockSymbol: "ETH_USD_15_Oct_2024_12_00",
+      quantity: 300,
+      price: 1500,
+      stockType: "yes",
+    });
+    expect(response.status).toBe(400);
+    expect(response.body.message).toBe("Insufficient stock balance");
 
     // Check order book after placing multiple sell orders
     response = await request(app).get("/orderbook");
