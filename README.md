@@ -16,7 +16,7 @@ for linux/mac users -
 1. install supertest library (npm i supertest)
 2. install jest (npm i jest)
 3. "scripts": {
-    "test": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" npx jest"
+    "test": "NODE_OPTIONS=\'$NODE_OPTIONS --experimental-vm-modules\' npx jest"
   }  
   add the script above in your package.json
 4. copy the test file inside your root folder
