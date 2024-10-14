@@ -1061,7 +1061,7 @@ describe("E-to-E-5", () => {
       userId: "user1",
       stockSymbol: "ETH_USD_15_Oct_2024_12_00",
       quantity: 100,
-      price: 600, // 6 rs
+      price: 600,
       stockType: "yes",
     });
     expect(response.status).toBe(200);
@@ -1085,6 +1085,22 @@ describe("E-to-E-5", () => {
     expect(response.status).toBe(200);
     expect(response.body.message).toBe("Buy order placed and pending");
 
+    // Additional INR balance checks after placing the buy order
+    response = await request(app).get("/balances/inr");
+    expect(response.status).toBe(200);
+    expect(response.body["user2"]).toEqual({
+      balance: 27500000,
+      locked: 2500000,
+    });
+
+    // Additional stock balance checks after placing the buy order
+    response = await request(app).get("/balances/stock");
+    expect(response.status).toBe(200);
+    expect(response.body["user2"]["ETH_USD_15_Oct_2024_12_00"]).toEqual({
+      yes: { quantity: 0, locked: 0 },
+      no: { quantity: 0, locked: 0 },
+    });
+
     // Step 9: Check the order book again to verify the corresponding 'no' sell order
     response = await request(app).get("/orderbook");
     expect(response.status).toBe(200);
@@ -1103,7 +1119,7 @@ describe("E-to-E-5", () => {
       locked: 2500000,
     });
 
-    // Step 11: User1 places a buy order for 'no' shares at 500 paise (5 rs), matching User2's implicit sell order
+    // Step 11: User1 places a buy order for 'no' shares at 500 paise, matching User2's implicit sell order
     response = await request(app).post("/order/buy").send({
       userId: "user1",
       stockSymbol: "ETH_USD_15_Oct_2024_12_00",
