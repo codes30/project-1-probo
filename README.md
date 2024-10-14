@@ -7,7 +7,7 @@ for windows users -
   }  
   add the script above in your package.json
 5. copy the test file inside your root folder
-6. fix the path of the imports in the test file if needed 
+6. fix the path of the imports in the test file if needed (make sure you export default your app from your main file)
 7. run "npm run test"
 
 
@@ -20,5 +20,5 @@ for linux/mac users -
   }  
   add the script above in your package.json
 4. copy the test file inside your root folder
-5. fix the path of the imports in the test file if needed 
+5. fix the path of the imports in the test file if needed (make sure you export default your app from your main file)
 6. run "npm run test"
