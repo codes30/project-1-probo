@@ -1033,19 +1033,19 @@ describe("E-to-E-5", () => {
     let response = await request(app).post("/trade/mint").send({
       userId: "user1",
       stockSymbol: "ETH_USD_15_Oct_2024_12_00",
-      quantity: 100,
+      quantity: 100, // Mint 100 'yes' and 100 'no' tokens
       price: 600,
     });
     expect(response.status).toBe(200);
     expect(response.body.message).toBe(
-      "Minted 100 'yes' and 'no' tokens for user user1, remaining balance is 44000000",
+      "Minted 100 'yes' and 'no' tokens for user user1, remaining balance is 49880000",
     );
 
     // Step 5: Check User1's balances after minting
     response = await request(app).get("/balances/inr");
     expect(response.status).toBe(200);
     expect(response.body["user1"]).toEqual({
-      balance: 44000000,
+      balance: 49880000,
       locked: 0,
     });
 
