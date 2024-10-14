@@ -8,7 +8,7 @@ describe("E-to-E-1", () => {
 
   it("this test just checks the response messages and status", async () => {
     // Step 1: Create a new user (User5)
-    let response = await request(app).get("/user/create/user5");
+    let response = await request(app).post("/user/create/user5");
     expect(response.status).toBe(201);
     expect(response.body.message).toBe("User user5 created");
 
@@ -21,7 +21,7 @@ describe("E-to-E-1", () => {
     expect(response.body.message).toBe("Onramped user5 with amount 50000");
 
     // Step 3: Create a new symbol
-    response = await request(app).get(
+    response = await request(app).post(
       "/symbol/create/AAPL_USD_25_Oct_2024_14_00",
     );
     expect(response.status).toBe(201);
@@ -55,7 +55,7 @@ describe("E-to-E-1", () => {
     );
 
     // Step 6: Create User6 and buy the 'no' tokens from the order book
-    response = await request(app).get("/user/create/user6");
+    response = await request(app).post("/user/create/user6");
     expect(response.status).toBe(201);
     expect(response.body.message).toBe("User user6 created");
 
@@ -98,7 +98,7 @@ describe("E-to-E-2", () => {
 
   it("this test checks the response values , status as well as state of the variables at regular intervals", async () => {
     // Step 1: Create a new user (User3)
-    let response = await request(app).get("/user/create/user3");
+    let response = await request(app).post("/user/create/user3");
     expect(response.status).toBe(201);
     expect(response.body.message).toBe("User user3 created");
 
@@ -119,7 +119,7 @@ describe("E-to-E-2", () => {
     });
 
     // Step 3: Create a new symbol
-    response = await request(app).get(
+    response = await request(app).post(
       "/symbol/create/ETH_USD_20_Oct_2024_10_00",
     );
     expect(response.status).toBe(201);
@@ -169,7 +169,7 @@ describe("E-to-E-2", () => {
     });
 
     // Step 6: Create User4 and buy the 'yes' tokens from the order book
-    response = await request(app).get("/user/create/user4");
+    response = await request(app).post("/user/create/user4");
     expect(response.status).toBe(201);
     expect(response.body.message).toBe("User user4 created");
 
@@ -225,16 +225,16 @@ describe("E-to-E-3", () => {
 
   it("should handle multiple matching orders and price priorities correctly", async () => {
     // Step 1: Create users (User1 and User2)
-    let response = await request(app).get("/user/create/user1");
+    let response = await request(app).post("/user/create/user1");
     expect(response.status).toBe(201);
     expect(response.body.message).toBe("User user1 created");
 
-    response = await request(app).get("/user/create/user2");
+    response = await request(app).post("/user/create/user2");
     expect(response.status).toBe(201);
     expect(response.body.message).toBe("User user2 created");
 
     // Step 2: Create a symbol
-    response = await request(app).get(
+    response = await request(app).post(
       "/symbol/create/ETH_USD_15_Oct_2024_12_00",
     );
     expect(response.status).toBe(201);
@@ -410,8 +410,8 @@ describe("E-to-E-3", () => {
     await request(app).post("/reset");
 
     // Step 1: Create users (User1 and User2)
-    await request(app).get("/user/create/user1");
-    await request(app).get("/user/create/user2");
+    await request(app).post("/user/create/user1");
+    await request(app).post("/user/create/user2");
 
     // Step 2: Add balance to users
     await request(app)
@@ -422,7 +422,7 @@ describe("E-to-E-3", () => {
       .send({ userId: "user2", amount: 300000 });
 
     // Step 3: Create a symbol and mint tokens for User1
-    await request(app).get("/symbol/create/ETH_USD_15_Oct_2024_12_00");
+    await request(app).post("/symbol/create/ETH_USD_15_Oct_2024_12_00");
     await request(app).post("/trade/mint").send({
       userId: "user1",
       stockSymbol: "ETH_USD_15_Oct_2024_12_00",
@@ -539,16 +539,16 @@ describe("E-to-E-4", () => {
 
   it("should handle multiple matching orders and price priorities correctly", async () => {
     // Step 1: Create users (User1 and User2)
-    let response = await request(app).get("/user/create/user1");
+    let response = await request(app).post("/user/create/user1");
     expect(response.status).toBe(201);
     expect(response.body.message).toBe("User user1 created");
 
-    response = await request(app).get("/user/create/user2");
+    response = await request(app).post("/user/create/user2");
     expect(response.status).toBe(201);
     expect(response.body.message).toBe("User user2 created");
 
     // Step 2: Create a symbol
-    response = await request(app).get(
+    response = await request(app).post(
       "/symbol/create/ETH_USD_15_Oct_2024_12_00",
     );
     expect(response.status).toBe(201);
@@ -702,9 +702,9 @@ describe("E-to-E-4", () => {
     await request(app).post("/reset");
 
     // Step 1: Create users (User1, User2, and User3)
-    await request(app).get("/user/create/user1");
-    await request(app).get("/user/create/user2");
-    await request(app).get("/user/create/user3");
+    await request(app).post("/user/create/user1");
+    await request(app).post("/user/create/user2");
+    await request(app).post("/user/create/user3");
 
     // Step 2: Add balance to users
     await request(app)
@@ -718,7 +718,7 @@ describe("E-to-E-4", () => {
       .send({ userId: "user3", amount: 400000 });
 
     // Step 3: Create a symbol and mint tokens for User1 and User3
-    await request(app).get("/symbol/create/ETH_USD_15_Oct_2024_12_00");
+    await request(app).post("/symbol/create/ETH_USD_15_Oct_2024_12_00");
     await request(app).post("/trade/mint").send({
       userId: "user1",
       stockSymbol: "ETH_USD_15_Oct_2024_12_00",
