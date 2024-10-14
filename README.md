@@ -3,7 +3,7 @@ for windows users -
 2. install supertest library (npm i supertest)
 3. install jest (npm i jest)
 4. "scripts": {
-    "test": "cross-env NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" npx jest"
+    "test": "cross-env NODE_OPTIONS=\'$NODE_OPTIONS --experimental-vm-modules\' npx jest"
   }  
   add the script above in your package.json
 5. copy the test file inside your root folder
