@@ -1,5 +1,6 @@
-import request from "supertest";
-import app from "./index";
+const request = require("supertest");
+// if you have a ts project, do dist/index instead of /index and make sure you follow readme
+const app = require("./index");
 
 describe("E-to-E-1", () => {
   beforeAll(async () => {
